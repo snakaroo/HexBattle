@@ -12,9 +12,11 @@ Pass the screen to the other player when the handoff prompt appears. Click **How
 
 - Each player starts with five cards, including a knight and an archer. Draw two at the beginning of subsequent turns, with a seven-card hand limit. Used cards are reshuffled when the deck runs out.
 - Each turn has two actions. Playing one card or activating one character uses one action. An **Extra Attack** pickup grants one additional action that turn.
-- Characters deploy only on their owner's edge. Supplies and terrain may be placed on any empty hex; whoever reaches a pickup first claims it.
+- Characters deploy only on their owner's edge. To place a supply or terrain card, select it and click **Roll to place**. This commits the card and one action. A 1 places it randomly; a 2–6 lets you choose an empty non-edge hex exactly that many hex steps from one of your active characters. A resting ram is not active, but a character that moved earlier this turn still is. If there is no active character or no hex at the rolled distance, placement is random instead. Items cannot go on either deployment edge or an occupied hex. If all non-edge hexes are occupied, item cards cannot be spent. Whoever reaches a pickup first claims it.
 - A knight, blacksmith, or thief moves/attacks an adjacent hex. An archer moves/attacks exactly two hexes along a straight hex direction. A ram attacks every hex along a three-hex line, advancing only if the route clears, then misses its next turn and takes extra damage while resting. A dragon breathes over two forward hexes and the two flanking the farther hex, including allies, then advances if possible.
 - Attacking and moving are a single action. A character enters its destination if the target has been defeated or the fence destroyed. The dragon and ram have area attacks as described above.
 - Defeat an enemy for 1 glory (a dragon for 2), or reach the opposite edge with a character for the first time for 2 glory. The first player to reach 6 glory wins.
 
 This is an initial ruleset intended for playtesting. It uses local pass-and-play rather than an AI or online opponent, and game state is not saved when the page is closed.
+
+See [GLOSSARY.md](GLOSSARY.md) for the game's terms.

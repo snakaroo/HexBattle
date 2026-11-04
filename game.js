@@ -31,13 +31,14 @@ function inside(q,r){return q>=0&&q<W&&r>=0&&r<H}
 function axial(q,r){return [q-Math.floor(r/2),r]}
 function offset(a,r){return [a+Math.floor(r/2),r]}
 function walk(q,r,direction,distance=1){const [a,row]=axial(q,r),[da,dr]=DIRS[direction];return offset(a+da*distance,row+dr*distance)}
+function hexDistance(q1,r1,q2,r2){const [a1]=axial(q1,r1),[a2]=axial(q2,r2),da=a1-a2,dr=r1-r2;return (Math.abs(da)+Math.abs(dr)+Math.abs(da+dr))/2}
 function cell(q,r){return game.cells.get(key(q,r))}
 function unitAt(q,r){return game.units.find(u=>u.hp>0&&u.q===q&&u.r===r)}
 function player(){return game.players[game.active]}
 function other(){return game.players[1-game.active]}
 function say(message){game.log.unshift(message);game.log=game.log.slice(0,8)}
 function newPlayer(){const deckList=[...DECK_LIST];deckList.splice(deckList.indexOf('knight'),1);deckList.splice(deckList.indexOf('archer'),1);const deck=shuffle(deckList);const hand=['knight','archer',...deck.splice(0,3)];return {hand,deck,discard:[],score:0,turns:0}}
-function newGame(){game={cells:new Map(),units:[],players:[newPlayer(),newPlayer()],active:0,round:1,actions:2,maxActions:2,selected:null,log:[],nextId:1,winner:null};for(let q=0;q<W;q++)for(let r=0;r<H;r++)game.cells.set(key(q,r),{q,r,item:null});game.players[0].turns=1;say('The borderlands await. Azure deploys first.');$('overlay').classList.add('hidden');render()}
+function newGame(){game={cells:new Map(),units:[],players:[newPlayer(),newPlayer()],active:0,round:1,actions:2,maxActions:2,selected:null,pendingPlacement:null,log:[],nextId:1,winner:null};for(let q=0;q<W;q++)for(let r=0;r<H;r++)game.cells.set(key(q,r),{q,r,item:null});game.players[0].turns=1;say('The borderlands await. Azure deploys first.');$('overlay').classList.add('hidden');render()}
 function drawCards(p,count){for(let i=0;i<count&&p.hand.length<7;i++){if(!p.deck.length){p.deck=shuffle(p.discard);p.discard=[]}if(!p.deck.length)break;p.hand.push(p.deck.pop())}}
 
 function targetsForUnit(u){
@@ -60,10 +61,11 @@ function targetsForUnit(u){
   return options;
 }
 function validTiles(){
+  if(game.pendingPlacement)return game.pendingPlacement.tiles.map(c=>key(c.q,c.r));
   if(!game.selected||game.actions<=0||game.winner!==null)return [];
   if(game.selected.kind==='unit')return targetsForUnit(game.units.find(u=>u.id===game.selected.id)).map(t=>key(...t.click));
   const type=player().hand[game.selected.index],def=CARDS[type];
-  if(!def)return [];
+  if(!def||def.kind!=='unit')return [];
   const results=[];
   for(const c of game.cells.values()){
     if(unitAt(c.q,c.r)||c.item)continue;
@@ -72,9 +74,29 @@ function validTiles(){
   }
   return results;
 }
-function selectCard(index){if(game.actions<=0||game.winner!==null)return;game.selected=game.selected?.kind==='card'&&game.selected.index===index?null:{kind:'card',index};render()}
+function emptyItemTiles(){return [...game.cells.values()].filter(c=>c.q>0&&c.q<W-1&&!unitAt(c.q,c.r)&&!c.item)}
+function placeItem(type,q,r){cell(q,r).item={type,hp:type==='fence'?2:undefined};say(`${SHORT[game.active]} places ${CARDS[type].name} on the field.`)}
+function rollItem(){
+  if(game.pendingPlacement||game.selected?.kind!=='card'||game.actions<=0)return;
+  const index=game.selected.index,type=player().hand[index];
+  if(!type||CARDS[type].kind==='unit')return;
+  const empty=emptyItemTiles();if(!empty.length)return;
+  const roll=Math.floor(Math.random()*6)+1;
+  const active=game.units.filter(u=>u.hp>0&&u.owner===game.active&&!(u.type==='ram'&&u.restUntil>=player().turns));
+  const eligible=roll===1?[]:empty.filter(c=>active.some(u=>hexDistance(u.q,u.r,c.q,c.r)===roll));
+  player().hand.splice(index,1);player().discard.push(type);game.selected=null;
+  spendAction();say(`${SHORT[game.active]} rolls a ${roll} for ${CARDS[type].name}.`);
+  if(eligible.length){game.pendingPlacement={type,roll,tiles:eligible};say(`Choose a glowing hex exactly ${roll} steps from an active character.`)}
+  else{const c=empty[Math.floor(Math.random()*empty.length)];placeItem(type,c.q,c.r);say(roll===1?'A roll of 1 places the item randomly.':'No eligible hex; the item is placed randomly.')}
+  render();
+}
+function selectCard(index){if(game.pendingPlacement||game.actions<=0||game.winner!==null)return;game.selected=game.selected?.kind==='card'&&game.selected.index===index?null:{kind:'card',index};render()}
 function selectHex(q,r){
   if(game.winner!==null)return;
+  if(game.pendingPlacement){
+    if(validTiles().includes(key(q,r))){placeItem(game.pendingPlacement.type,q,r);game.pendingPlacement=null;render()}
+    return;
+  }
   const occupant=unitAt(q,r),selected=game.selected;
   if(selected&&game.actions>0&&validTiles().includes(key(q,r))){
     if(selected.kind==='card')playCard(selected.index,q,r);
@@ -87,11 +109,9 @@ function selectHex(q,r){
 function spendAction(){game.actions--;if(game.actions<=0)say(`${SHORT[game.active]} is out of actions. End the turn when ready.`)}
 function playCard(index,q,r){
   const p=player(),type=p.hand.splice(index,1)[0],def=CARDS[type];p.discard.push(type);
-  if(def.kind==='unit'){
-    const u={id:game.nextId++,type,owner:game.active,q,r,hp:def.hp,shield:0,confused:0,sword:false,restUntil:0,breached:false};game.units.push(u);
-    say(`${SHORT[game.active]} deploys a ${def.name}.`);
-    if(type==='blacksmith'){const ally=game.units.find(a=>a.id!==u.id&&a.owner===u.owner&&DIRS.some((_,direction)=>{const [x,y]=walk(q,r,direction);return a.q===x&&a.r===y}));if(ally){ally.shield++;say(`The blacksmith shields an allied ${CARDS[ally.type].name}.`)}}
-  }else{cell(q,r).item={type,hp:type==='fence'?2:undefined};say(`${SHORT[game.active]} places ${def.name} on the field.`)}
+  const u={id:game.nextId++,type,owner:game.active,q,r,hp:def.hp,shield:0,confused:0,sword:false,restUntil:0,breached:false};game.units.push(u);
+  say(`${SHORT[game.active]} deploys a ${def.name}.`);
+  if(type==='blacksmith'){const ally=game.units.find(a=>a.id!==u.id&&a.owner===u.owner&&DIRS.some((_,direction)=>{const [x,y]=walk(q,r,direction);return a.q===x&&a.r===y}));if(ally){ally.shield++;say(`The blacksmith shields an allied ${CARDS[ally.type].name}.`)}}
   spendAction();
 }
 function damageUnit(target,amount,attacker,source){
@@ -169,7 +189,7 @@ function activate(u,q,r){
   spendAction();
 }
 function checkWin(){for(let i=0;i<2;i++)if(game.players[i].score>=6&&game.winner===null){game.winner=i;say(`${NAMES[i]} wins the battle!`);showOverlay('VICTORY',`${NAMES[i]} wins!`,`The borderlands belong to ${SHORT[i]}. Play another battle?`,'Play again',newGame)}}
-function endTurn(){if(game.winner!==null)return;game.selected=null;game.active=1-game.active;if(game.active===0)game.round++;game.actions=2;game.maxActions=2;const p=player();p.turns++;drawCards(p,2);say(`${SHORT[game.active]}'s turn begins. 2 cards drawn.`);render();showOverlay('PASS THE SCREEN',`${NAMES[game.active]}'s turn`,`Hand the device to ${SHORT[game.active]}. Their hand stays hidden until they are ready.`,'Ready to play',()=>{$('overlay').classList.add('hidden');render()})}
+function endTurn(){if(game.winner!==null||game.pendingPlacement)return;game.selected=null;game.active=1-game.active;if(game.active===0)game.round++;game.actions=2;game.maxActions=2;const p=player();p.turns++;drawCards(p,2);say(`${SHORT[game.active]}'s turn begins. 2 cards drawn.`);render();showOverlay('PASS THE SCREEN',`${NAMES[game.active]}'s turn`,`Hand the device to ${SHORT[game.active]}. Their hand stays hidden until they are ready.`,'Ready to play',()=>{$('overlay').classList.add('hidden');render()})}
 function showOverlay(kicker,title,body,button,action){$('overlayKicker').textContent=kicker;$('overlayTitle').textContent=title;$('overlayBody').textContent=body;$('overlayButton').firstChild.textContent=button+' ';$('overlayButton').onclick=action;$('overlay').classList.remove('hidden')}
 
 function svgEl(tag,attrs={},text){const el=document.createElementNS(SVG,tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v);if(text!==undefined)el.textContent=text;return el}
@@ -195,9 +215,13 @@ function render(){
   $('actionText').textContent=`${game.actions} action${game.actions===1?'':'s'} remaining`;
   $('actionPips').replaceChildren(...Array.from({length:game.maxActions},(_,i)=>{const el=document.createElement('i');if(i>=game.actions)el.className='spent';return el}));
   $('deckCount').textContent=`Deck: ${p.deck.length}`;
-  $('hand').replaceChildren(...p.hand.map((type,i)=>{const def=CARDS[type],b=document.createElement('button');b.className=`card ${def.kind} ${game.selected?.kind==='card'&&game.selected.index===i?'selected':''}`;b.innerHTML=`<span class="card-top"><span class="symbol">${def.icon}</span><span class="card-kind">${def.kind}</span></span><strong>${def.name}</strong><span class="stats">${def.kind==='unit'?`${def.hp} health · ${def.damage} damage`:def.kind==='terrain'?'Map card':'Pick-up'}</span>`;b.setAttribute('aria-label',`${def.name}. ${def.description}`);b.onclick=()=>selectCard(i);return b}));
+  $('hand').replaceChildren(...p.hand.map((type,i)=>{const def=CARDS[type],b=document.createElement('button');b.className=`card ${def.kind} ${game.selected?.kind==='card'&&game.selected.index===i?'selected':''}`;b.innerHTML=`<span class="card-top"><span class="symbol">${def.icon}</span><span class="card-kind">${def.kind}</span></span><strong>${def.name}</strong><span class="stats">${def.kind==='unit'?`${def.hp} health · ${def.damage} damage`:'Roll to place'}</span>`;b.setAttribute('aria-label',`${def.name}. ${def.description}`);b.disabled=!!game.pendingPlacement;b.onclick=()=>selectCard(i);return b}));
+  $('endTurn').disabled=!!game.pendingPlacement;
+  const rollButton=$('rollButton');rollButton.classList.toggle('hidden',game.selected?.kind!=='card'||CARDS[p.hand[game.selected?.index]]?.kind==='unit'||!!game.pendingPlacement);
+  rollButton.disabled=emptyItemTiles().length===0;
   const s=game.selected;
-  if(s?.kind==='card'){$('detail').innerHTML=`<strong>${CARDS[p.hand[s.index]].name}</strong><br>${CARDS[p.hand[s.index]].description}<br><br><em>Choose a glowing hex to play it.</em>`}
+  if(game.pendingPlacement){const pending=game.pendingPlacement;$('detail').innerHTML=`<strong>Rolled ${pending.roll} · ${CARDS[pending.type].name}</strong><br>Choose a glowing empty hex exactly ${pending.roll} steps from one of your active characters. This placement is committed.`}
+  else if(s?.kind==='card'){const def=CARDS[p.hand[s.index]];$('detail').innerHTML=`<strong>${def.name}</strong><br>${def.description}<br><br><em>${def.kind==='unit'?'Choose a glowing hex to deploy.':emptyItemTiles().length?'Click Roll to place. This commits one action and the card.':'No free non-edge hexes. This item cannot be spent.'}</em>`}
   else if(s?.kind==='unit'){const u=game.units.find(u=>u.id===s.id),def=CARDS[u.type],resting=u.restUntil>=p.turns&&u.type==='ram';$('detail').innerHTML=`<strong>${def.name}</strong> · ${u.hp}/${def.hp} health · ${u.shield} shield<br>${def.description}${u.sword?'<br>⚔ +1 damage, -1 health when attacking.':''}${u.confused?'<br>↝ Next direction is reversed.':''}${resting?'<br>Resting: cannot act this turn and takes +1 damage.':''}<br><br><em>${resting?'Choose another card or unit.':'Choose a glowing hex to act.'}</em>`}
   else $('detail').textContent=game.actions?'Select a card to deploy, or one of your units to move and attack.':'No actions left. End the turn when ready.';
   $('log').replaceChildren(...game.log.map(line=>{const el=document.createElement('div');el.textContent=line;return el}));
@@ -206,6 +230,7 @@ function render(){
 $('board').addEventListener('click',e=>{const g=e.target.closest('.hex');if(g)selectHex(+g.dataset.q,+g.dataset.r)});
 $('board').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){const g=e.target.closest('.hex');if(g){e.preventDefault();selectHex(+g.dataset.q,+g.dataset.r)}}});
 $('endTurn').onclick=endTurn;
+$('rollButton').onclick=rollItem;
 $('newButton').onclick=()=>{if(confirm('Start a new battle? Your current game will be lost.'))newGame()};
 $('rulesButton').onclick=()=>$('rulesDialog').showModal();
 $('closeRules').onclick=()=>$('rulesDialog').close();
