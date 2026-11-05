@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#142b2a">
+  <meta name="referrer" content="no-referrer">
   <title>Hex Battle — The Borderlands</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -14,6 +15,7 @@
         <div class="top-actions"><button id="viewButton" class="text-button" type="button" aria-label="Switch to flat view"><span class="view-label">View: Isometric</span><span class="view-icon">▱</span></button><button id="rulesButton" class="text-button">How to play <span>↗</span></button><button id="newButton" class="text-button">New game <span>↻</span></button></div>
     </header>
 
+    <section id="onlineStatus" class="online-status hidden" aria-live="polite"><span id="onlineMessage"></span><button id="closeMatch" class="hidden" type="button">Close match</button><div id="invitePanel" class="hidden"><input id="inviteLink" readonly aria-label="Invitation link"><button id="copyInvite" type="button">Copy link</button><button id="cancelMatch" type="button">Cancel match</button></div></section>
     <main class="layout">
       <section class="arena-panel" aria-label="Battlefield">
         <div class="scorebar">
@@ -32,7 +34,7 @@
         <section class="log-section"><div class="section-title">BATTLE LOG</div><div id="log" class="log"></div></section>
       </aside>
     </main>
-    <footer class="page-footer">HEX BATTLE <span>·</span> LOCAL TWO-PLAYER PROTOTYPE <span>·</span> PASS THE SCREEN BETWEEN TURNS</footer>
+    <footer class="page-footer">HEX BATTLE <span>·</span> LOCAL OR PRIVATE ONLINE MATCH</footer>
   </div>
 
   <div id="overlay" class="overlay hidden" aria-live="polite"><div class="modal"><div class="modal-emblem">⬡</div><span id="overlayKicker" class="eyebrow">NEXT TURN</span><h2 id="overlayTitle">Pass the screen</h2><p id="overlayBody"></p><button id="overlayButton" class="end-button">Ready to play <span>→</span></button></div></div>
@@ -53,10 +55,12 @@
       <select id="actionAllowance" name="actionAllowance">
         <option value="1">1 action</option><option value="2" selected>2 actions</option><option value="3">3 actions</option><option value="4">4 actions</option><option value="5">5 actions</option>
       </select>
+      <label for="gameMode">Play mode</label><select id="gameMode"><option value="local">Local · pass the screen</option><option value="online">Online · invite a friend</option></select>
       <div class="setup-actions"><button id="cancelSetup" class="setup-cancel" type="button">Cancel</button><button class="end-button" type="submit">Start game <span>→</span></button></div>
     </form>
   </dialog>
   <dialog id="rulesDialog" class="rules-dialog"><div class="rules-header"><span class="eyebrow">FIELD MANUAL</span><button id="closeRules" class="close-button" aria-label="Close rules">×</button></div><h2>How to play</h2><p>Take turns playing cards or moving units. In New Game setup, choose <strong>5–9 rows</strong>, <strong>6–12 hexes in the shorter rows</strong>, and <strong>1–5 actions per turn</strong> for both players. Every other row has one extra hex. Each card played and each unit activated costs one action. A character can move or attack <strong>once per turn</strong>, including after deployment if you have another action. Draw 2 cards at the start of each turn (up to 7 in hand).</p><div class="rules-grid"><div><h3>01 / Deploy</h3><p>Place characters on your own edge only: Azure on the left, Ember on the right. The staggered rows are centered for a mirrored outline. For a supply or terrain card, select it and click <strong>Roll to place</strong>. That commits the card and one action. A 1 places it randomly; a 2–6 lets you choose an empty hex exactly that many steps from one of your active characters. A resting ram is not active. If there are no active characters or no eligible hexes, it is placed randomly instead. Items never go on either deployment edge.</p></div><div><h3>02 / Move & attack</h3><p>Select your unit, then a glowing hex. Movement and attacking are one action: you occupy the destination if its defender falls. You cannot move onto a living unit or fence. A stored Extra Attack allows that character one second move or attack, using another player action; it never grants a player action or stacks. Opponent items look like empty hexes until discovered. A fence you strike stays visible to you.</p></div><div><h3>03 / Win glory</h3><p>Defeating a unit earns 1 glory (a dragon earns 2). The first time each of your units reaches the far edge earns 2 glory. First to 6 wins.</p></div><div><h3>04 / Special moves</h3><p>Archers leap exactly 2 hexes, never 1. Rams strike all 3 hexes in a line, collecting items on hexes they cross. A surviving obstacle stops their travel but not farther strikes. With Extra Attack, a ram can charge twice before resting next turn and taking +1 damage. Dragons breathe across four hexes in a forward cone, including allies.</p></div></div><p class="rules-foot">Item effects appear briefly over the board, and hits flash with a damage number. A ✓ marker shows a character that already acted this turn; ✦ shows a stored Extra Attack. Blacksmiths shield an adjacent ally when deployed. Thieves steal a shield when they hit. Fences block movement, brambles hurt entrants, and Confusion sends an entering character back to its previous hex. <strong>Soup of Seeing</strong> is played directly on one of your characters for one action, without a die roll. It reveals a snapshot of opponent items in that character’s possible move hexes for the rest of your turn (all three hexes along a ram’s charge). It does not heal or move the character. Multiple Soups combine.</p></dialog>
+  <script src="engine.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

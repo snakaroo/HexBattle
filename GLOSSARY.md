@@ -1,5 +1,7 @@
 # Hex Battle glossary
 
+- **Dockerfile:** The recipe for building the container that runs Hex Battle's online game service. The companion Compose configuration mounts persistent match storage.
+
 - **Active character:** A living character on the board owned by the current player. It still counts if it already moved this turn. A battering ram resting after a charge does not count until its rest turn ends.
 - **Deployment edge:** The leftmost hex of each row for Azure or the rightmost hex for Ember. Characters deploy on their own edge; items cannot be placed on either edge. The wider staggered rows have an extra hex but still have one outermost hex on each side.
 - **Item:** A supply or terrain card placed on a hex, such as a shield, potion, fence, or bramble. Character cards and Soup of Seeing are not map items.

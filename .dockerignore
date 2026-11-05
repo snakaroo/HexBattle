@@ -1,0 +1,4 @@
+.git
+data
+*.sqlite*
+test

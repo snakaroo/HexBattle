@@ -1,10 +1,22 @@
 # Hex Battle
 
-A playable, local two-player card battle prototype on a symmetric hex board with a customizable size. No account, installation, or build step is needed.
+A two-player card battle on a symmetric hex board, playable locally or as a private live online match. Local play needs no account, installation, or build step.
 
 ## Play
 
 Open `index.html` in a web browser. Or, if you have Python installed, run `python3 -m http.server 3000` here and visit `http://localhost:3000`.
+
+For online play, run `mise exec -- node server.js` and visit `http://localhost:3000` locally. Choose **Online** in setup, copy the invitation link, and send it to the second player. The invitee sees the board and turn settings before claiming the remaining seat. Both players must stay connected; a disconnected player can rejoin in the same browser, and moves pause until both return. The service uses Node 26.13.0's built-in HTTP and SQLite modules, with no npm dependencies. Run automated checks with `mise exec -- node --test`.
+
+## Deploy online play
+
+`docker compose up --build -d` builds one service and mounts its SQLite database in the named `matches` volume. The Compose service exposes port 3000 **only inside Docker**; it does not publish a host port. Building the image downloads the pinned Node base image.
+
+On **Dokploy**, deploy this as a Docker Compose application. In its **Domains** tab, add your HTTPS domain, select the `hex-battle` service and internal port **3000**. Dokploy attaches its Traefik network and routing labels; no host port or hand-written Traefik labels are needed. Use **Preview Compose** in Dokploy to verify the resulting network and routing. Keep streaming responses open for `/api/matches/*/events` (no proxy buffering or short timeout). Share the HTTPS invitation URL, not the container's HTTP address. If you deploy the Dockerfile as a Dokploy Application instead, set its internal port to 3000 and attach a domain there.
+
+Outside Dokploy, attach your reverse proxy to the same Docker network as `hex-battle`, or add an appropriate localhost-only `ports` mapping for a proxy running directly on the host. Alternatively run Node with `DB_PATH=/path/to/persistent/matches.sqlite` and `PORT=3000`.
+
+`MAX_ACTIVE_MATCHES` (default 100) caps concurrent stored matches; `CREATE_LIMIT_PER_HOUR` (default 20 per IP) limits creation. Active and waiting matches expire after 24 hours without moves or joins. Finished matches are deleted once both players close or disconnect. Browser-local seat tokens are not account credentials: clearing browser storage prevents rejoining. A reverse proxy may add its own IP-based restrictions for an internet-facing installation.
 
 In New Game setup, choose 5–9 rows (default 5), 6–12 hexes in the shorter rows (default 8), and 1–5 actions per turn for both players (default 2). Alternate rows have one extra hex, so the default board is 5 rows of 8/9 hexes. Pass the screen to the other player when the handoff prompt appears. Click **How to play** in the game for the full rules.
 
@@ -20,6 +32,6 @@ In New Game setup, choose 5–9 rows (default 5), 6–12 hexes in the shorter ro
 - Item encounters show a brief on-board message describing the effect. Hits and shield blocks have visual cues and floating numbers. Multiple effects play in order without delaying actions; messages clear at turn handoff, and motion is reduced when requested by the device.
 - The battlefield starts in a fixed isometric view with raised hexes. Use **View: Isometric / Flat** beside How to play and New game to switch at any time. The choice is remembered for the current browser session, including new games; the grid, rules, and hidden-item visibility are unchanged.
 
-This is an initial ruleset intended for playtesting. It uses local pass-and-play rather than an AI or online opponent, and game state is not saved when the page is closed.
+This is an initial ruleset intended for playtesting. Local pass-and-play is not saved when the page closes; active online matches survive service restarts when their database is on a persistent volume.
 
 See [GLOSSARY.md](GLOSSARY.md) for the game's terms.
