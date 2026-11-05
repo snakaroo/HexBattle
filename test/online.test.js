@@ -28,6 +28,7 @@ async function connect(base,id,token){
 
 test('shared rules retain turn, action and move behavior',()=>{
   const game=createGame();assert.equal(game.state.active,0);
+  for(const player of game.state.players){assert.equal(player.hand.length,7);assert.equal(player.deck.length,26);assert.equal(player.hand[0],'knight');assert.equal(player.hand[1],'archer')}
   game.selectCard(0);game.selectHex(0,0);
   assert.equal(game.state.units.length,1);assert.equal(game.state.actions,1);
   game.selectCard(-1);assert.equal(game.state.selected,null);
@@ -59,6 +60,8 @@ test('private joining, turn authorization, pausing, reconnect and persistent sta
   assert.equal((await request(base,`/api/matches/${id}`,'bad')).status,403);
   const joined=await request(base,`/api/matches/${id}/join`,null,{invite:invitation.searchParams.get('invite')});
   assert.equal(joined.status,201);
+  assert.equal((await request(base,`/api/matches/${id}`,hostToken)).data.state.players[0].hand.length,7);
+  assert.equal((await request(base,`/api/matches/${id}`,joined.data.token)).data.state.players[1].hand.length,7);
   assert.equal((await request(base,`/api/matches/${id}/join`,null,{invite:invitation.searchParams.get('invite')})).status,403);
   const guestToken=joined.data.token;
   assert.equal((await request(base,`/api/matches/${id}/moves`,hostToken,{type:'selectCard',index:0})).status,409);

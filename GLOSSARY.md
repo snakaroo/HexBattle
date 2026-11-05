@@ -1,5 +1,6 @@
 # Hex Battle glossary
 
+- **Starting hand:** The seven cards each player receives when a new match begins: one Knight, one Archer, and five random cards from their deck.
 - **Dockerfile:** The recipe for building the container that runs Hex Battle's online game service. The companion Compose configuration mounts persistent match storage.
 
 - **Active character:** A living character on the board owned by the current player. It still counts if it already moved this turn. A battering ram resting after a charge does not count until its rest turn ends.

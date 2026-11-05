@@ -42,7 +42,7 @@ function unitAt(q,r){return game.units.find(u=>u.hp>0&&u.q===q&&u.r===r)}
 function player(){return game.players[game.active]}
 function other(){return game.players[1-game.active]}
 function say(message,secretOwner=null){game.log.unshift({message,secretOwner});game.log=game.log.slice(0,8)}
-function newPlayer(){const deckList=[...DECK_LIST];deckList.splice(deckList.indexOf('knight'),1);deckList.splice(deckList.indexOf('archer'),1);const deck=shuffle(deckList);const hand=['knight','archer',...deck.splice(0,3)];return {hand,deck,discard:[],score:0,turns:0}}
+function newPlayer(){const deckList=[...DECK_LIST];deckList.splice(deckList.indexOf('knight'),1);deckList.splice(deckList.indexOf('archer'),1);const deck=shuffle(deckList);const hand=['knight','archer',...deck.splice(0,5)];return {hand,deck,discard:[],score:0,turns:0}}
 function newGame(actionAllowance=2,width=DEFAULT_WIDTH,height=DEFAULT_HEIGHT){effects=[];game={width,height,cells:new Map(),units:[],players:[newPlayer(),newPlayer()],active:0,round:1,actionAllowance,actions:actionAllowance,maxActions:actionAllowance,selected:null,pendingPlacement:null,revealed:[new Set(),new Set()],log:[],nextId:1,winner:null};for(let r=0;r<height;r++)for(let q=0;q<rowWidth(r);q++)game.cells.set(key(q,r),{q,r,item:null});game.players[0].turns=1;say('The borderlands await. Azure deploys first.');}
 function drawCards(p,count){for(let i=0;i<count&&p.hand.length<7;i++){if(!p.deck.length){p.deck=shuffle(p.discard);p.discard=[]}if(!p.deck.length)break;p.hand.push(p.deck.pop())}}
 function canActivate(u){return u.hp>0&&u.owner===game.active&&u.activations<2&&(u.activations===0||u.extraReady)&&!(u.type==='ram'&&u.restUntil===player().turns)}
