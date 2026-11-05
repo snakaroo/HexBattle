@@ -5,7 +5,7 @@ const SHORT = ['Azure', 'Ember'];
 const CARDS = {
   knight:{name:'Knight',icon:'♞',kind:'unit',hp:3,damage:1,description:'Moves or attacks 1 adjacent hex. A sturdy front-line fighter.'},
   archer:{name:'Archer',icon:'➶',kind:'unit',hp:2,damage:1,description:'Moves or attacks exactly 2 hexes along any of its 6 straight lines. No close-range move.'},
-  ram:{name:'Battering Ram',icon:'⚒',kind:'unit',hp:4,damage:2,description:'Strikes all 3 hexes in a line, collecting items it crosses. May charge twice with Extra Attack before resting next turn.'},
+  ram:{name:'Battering Ram',icon:'🪵',kind:'unit',hp:4,damage:2,description:'Strikes all 3 hexes in a line, collecting items it crosses. May charge twice with Extra Attack before resting next turn.'},
   dragon:{name:'Dragon',icon:'♜',kind:'unit',hp:5,damage:2,description:'Breathes onto the 2 tiles ahead and the 2 flanking the far tile, then advances. Fire also hits your own army.'},
   blacksmith:{name:'Blacksmith',icon:'⚒',kind:'unit',hp:3,damage:1,description:'Moves 1 adjacent hex. On deployment, gives an adjacent ally 1 shield.'},
   thief:{name:'Thief',icon:'◆',kind:'unit',hp:2,damage:1,description:'Moves 1 adjacent hex. Steals 1 shield from an enemy it strikes.'},
@@ -23,6 +23,7 @@ const DECK_LIST = ['knight','knight','knight','knight','archer','archer','archer
 const $ = id => document.getElementById(id);
 let game;
 let effectTimer=null, effectQueue=[];
+let viewMode=(()=>{try{return sessionStorage.getItem('hex-battle-view')==='flat'?'flat':'isometric'}catch{return 'isometric'}})();
 
 function shuffle(items){const a=[...items];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function key(q,r){return `${q},${r}`}
@@ -49,26 +50,33 @@ function clearEffects(){
 }
 function hexSize(){return Math.min(60,810/(Math.sqrt(3)*(game.width+1)),570/(1.5*(game.height-1)+2))}
 function boardPoint(q,r){const size=hexSize();return [475+Math.sqrt(3)*size*(q-(r%2)/2-(game.width-1)/2),345+1.5*size*(r-(game.height-1)/2)]}
+function projectPoint(x,y){if(viewMode==='flat')return [x,y];return [475+(x-475)*(.84+.32*y/690),345+(y-345)*.72]}
+function screenPoint(q,r){return projectPoint(...boardPoint(q,r))}
+function switchView(){clearEffects();viewMode=viewMode==='isometric'?'flat':'isometric';try{sessionStorage.setItem('hex-battle-view',viewMode)}catch{}render()}
 function showNextEffect(){
   if(effectTimer!==null||!effectQueue.length)return;
   const effect=effectQueue.shift(),container=$('battleEffects');container.replaceChildren();
   const toast=document.createElement('div');toast.className=`effect-toast ${effect.kind}`;toast.textContent=effect.message;container.append(toast);
   let targetHex=null,attackerHex=null;
   if(effect.target){
-    const [q,r]=effect.target,[x,y]=boardPoint(q,r);
+    const [q,r]=effect.target,[x,y]=screenPoint(q,r);
     targetHex=$('board').querySelector(`.hex[data-q="${q}"][data-r="${r}"]`);
     targetHex?.classList.add(`effect-${effect.kind}`);
     const floater=document.createElement('div');floater.className=`effect-float ${effect.kind}`;floater.textContent=effect.label;
     floater.style.left=`${x/950*100}%`;floater.style.top=`${y/690*100}%`;container.append(floater);
     if(effect.attacker){
-      const [aq,ar]=effect.attacker,[ax,ay]=boardPoint(aq,ar),distance=Math.hypot(x-ax,y-ay)||1;
+      const [aq,ar]=effect.attacker,[ax,ay]=screenPoint(aq,ar),distance=Math.hypot(x-ax,y-ay)||1;
       attackerHex=$('board').querySelector(`.hex[data-q="${aq}"][data-r="${ar}"]`);
+      const attackerContent=$('board').querySelector(`.tile-content[data-q="${aq}"][data-r="${ar}"]`);
       attackerHex?.style.setProperty('--lunge-x',`${(x-ax)/distance*10}px`);
       attackerHex?.style.setProperty('--lunge-y',`${(y-ay)/distance*10}px`);
       attackerHex?.classList.add('effect-lunge');
+      attackerContent?.style.setProperty('--lunge-x',`${(x-ax)/distance*10}px`);
+      attackerContent?.style.setProperty('--lunge-y',`${(y-ay)/distance*10}px`);
+      attackerContent?.classList.add('effect-lunge');
     }
   }
-  effectTimer=setTimeout(()=>{targetHex?.classList.remove(`effect-${effect.kind}`);attackerHex?.classList.remove('effect-lunge');container.replaceChildren();effectTimer=null;showNextEffect()},900);
+  effectTimer=setTimeout(()=>{targetHex?.classList.remove(`effect-${effect.kind}`);attackerHex?.classList.remove('effect-lunge');$('board').querySelectorAll('.tile-content.effect-lunge').forEach(el=>el.classList.remove('effect-lunge'));container.replaceChildren();effectTimer=null;showNextEffect()},900);
 }
 function newPlayer(){const deckList=[...DECK_LIST];deckList.splice(deckList.indexOf('knight'),1);deckList.splice(deckList.indexOf('archer'),1);const deck=shuffle(deckList);const hand=['knight','archer',...deck.splice(0,3)];return {hand,deck,discard:[],score:0,turns:0}}
 function newGame(actionAllowance=2,width=DEFAULT_WIDTH,height=DEFAULT_HEIGHT){clearEffects();game={width,height,cells:new Map(),units:[],players:[newPlayer(),newPlayer()],active:0,round:1,actionAllowance,actions:actionAllowance,maxActions:actionAllowance,selected:null,pendingPlacement:null,revealed:[new Set(),new Set()],log:[],nextId:1,winner:null};for(let r=0;r<height;r++)for(let q=0;q<rowWidth(r);q++)game.cells.set(key(q,r),{q,r,item:null});game.players[0].turns=1;say('The borderlands await. Azure deploys first.');$('overlay').classList.add('hidden');render()}
@@ -269,24 +277,45 @@ function openSetup(initial=false){$('actionAllowance').value=String(game.actionA
 function svgEl(tag,attrs={},text){const el=document.createElementNS(SVG,tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,v);if(text!==undefined)el.textContent=text;return el}
 function renderBoard(){
   const board=$('board');board.replaceChildren();board.setAttribute('aria-label',`Symmetric battlefield with ${game.height} rows of ${game.width} or ${game.width+1} hexes`);
-  const valid=new Set(validTiles());
-  const size=Math.min(60,810/(Math.sqrt(3)*(game.width+1)),570/(1.5*(game.height-1)+2));
+  const valid=new Set(validTiles()),size=hexSize(),isometric=viewMode==='isometric',content=[];
+  document.querySelector('.board-wrap').classList.toggle('isometric',isometric);
+  $('viewButton').querySelector('.view-label').textContent=`View: ${isometric?'Isometric':'Flat'}`;
+  $('viewButton').querySelector('.view-icon').textContent=isometric?'▱':'⬡';
+  $('viewButton').setAttribute('aria-label',`Switch to ${isometric?'flat':'isometric'} view`);
   for(let r=0;r<game.height;r++)for(let q=0;q<rowWidth(r);q++){
-    const x=475+Math.sqrt(3)*size*(q-(r%2)/2-(game.width-1)/2),y=345+1.5*size*(r-(game.height-1)/2);
-    const vertices=Array.from({length:6},(_,i)=>{const a=Math.PI/180*(60*i-30);return `${(x+size*.96*Math.cos(a)).toFixed(1)},${(y+size*.96*Math.sin(a)).toFixed(1)}`}).join(' ');
+    const [baseX,baseY]=boardPoint(q,r),[x,y]=screenPoint(q,r);
+    const vertices=Array.from({length:6},(_,i)=>{const a=Math.PI/180*(60*i-30);return projectPoint(baseX+size*.96*Math.cos(a),baseY+size*.96*Math.sin(a))});
+    const points=vertices.map(([vx,vy])=>`${vx.toFixed(1)},${vy.toFixed(1)}`).join(' ');
     const c=cell(q,r),u=unitAt(q,r),visible=itemVisible(c),g=svgEl('g',{'class':`hex ${((q+r)%2?'alt ':'')}${onEdge(q,r,0)?'home-blue ':onEdge(q,r,1)?'home-red ':''}${valid.has(key(q,r))?'valid ':''}${game.selected?.kind==='unit'&&u?.id===game.selected.id?'selected-tile':''}`,'data-q':q,'data-r':r,role:'button',tabindex:'0','aria-label':`${String.fromCharCode(65+q)}${r+1}${u?`, ${SHORT[u.owner]} ${CARDS[u.type].name}, ${u.hp} health`:''}${visible?`, ${CARDS[c.item.type].name}`:''}${valid.has(key(q,r))?', available target':''}`});
-    g.append(svgEl('polygon',{points:vertices}));
-    if(visible){g.append(svgEl('circle',{cx:x,cy:y,r:size*.48,'class':'item-bg'}));g.append(svgEl('text',{x,y:y+1,'class':'item-icon'},CARDS[c.item.type].icon));if(c.item.type==='fence')g.append(svgEl('text',{x:x+size*.46,y:y+size*.52,'class':'unit-status'},String(c.item.hp)))}
-    else if(u){
-      g.append(svgEl('circle',{cx:x,cy:y,r:size*.56,'class':`unit-disc ${u.owner?'red':'blue'}`}));
-      g.append(svgEl('text',{x,y:y-4,'class':'unit-icon'},CARDS[u.type].icon));
-      g.append(svgEl('text',{x,y:y+size*.44,'class':'unit-hp'},`${'♥'.repeat(Math.min(u.hp,5))}${u.shield?' ◈'+u.shield:''}`));
-      if(u.owner===game.active&&u.activations>0)g.append(svgEl('text',{x:x-size*.55,y:y-size*.39,'class':'unit-used'},u.activations===2?'2×':'✓'));
-      if(u.extraReady)g.append(svgEl('text',{x:x+size*.55,y:y+size*.05,'class':'unit-status'},'✦'));
-      if(u.restUntil===game.players[u.owner].turns&&u.type==='ram')g.append(svgEl('text',{x:x+size*.56,y:y-size*.42,'class':'unit-status'},'Z'));
+    if(isometric){
+      const depth=size*.27;
+      g.append(svgEl('polygon',{'class':'tile-bottom',points:vertices.map(([vx,vy])=>`${vx.toFixed(1)},${(vy+depth).toFixed(1)}`).join(' ')}));
+      for(let i=1;i<=3;i++){
+        const [ax,ay]=vertices[i],[bx,by]=vertices[(i+1)%6];
+        g.append(svgEl('polygon',{'class':`tile-side ${i===1?'side-right':'side-left'}`,points:`${ax.toFixed(1)},${ay.toFixed(1)} ${bx.toFixed(1)},${by.toFixed(1)} ${bx.toFixed(1)},${(by+depth).toFixed(1)} ${ax.toFixed(1)},${(ay+depth).toFixed(1)}`}));
+      }
     }
-    else if(!valid.has(key(q,r)))g.append(svgEl('text',{x,y:y+3,'class':'coord'},`${String.fromCharCode(65+q)}${r+1}`));
-    if(valid.has(key(q,r)))g.append(svgEl('circle',{cx:x,cy:y,r:size*.67,'class':'glow'}));
+    g.append(svgEl('polygon',{'class':'tile-top',points}));
+    if(valid.has(key(q,r))){
+      if(isometric)g.append(svgEl('ellipse',{cx:x,cy:y,rx:size*.62,ry:size*.39,'class':'glow'}));
+      else g.append(svgEl('circle',{cx:x,cy:y,r:size*.67,'class':'glow'}));
+    }
+    board.append(g);
+    content.push({q,r,x,y,c,u,visible});
+  }
+  for(const {q,r,x,y,c,u,visible} of content){
+    const g=svgEl('g',{'class':'hex tile-content','data-q':q,'data-r':r,'aria-hidden':'true','pointer-events':'none'});
+    const lift=isometric?size*.13:0,discSize=isometric?size*.45:size*.56;
+    if(visible){g.append(svgEl('circle',{cx:x,cy:y-lift,r:isometric?size*.4:size*.48,'class':'item-bg'}));g.append(svgEl('text',{x,y:y-lift+1,'class':'item-icon'},CARDS[c.item.type].icon));if(c.item.type==='fence')g.append(svgEl('text',{x:x+size*.46,y:y+size*.52,'class':'unit-status'},String(c.item.hp)))}
+    else if(u){
+      if(isometric)g.append(svgEl('ellipse',{cx:x,cy:y+size*.17,rx:size*.43,ry:size*.16,'class':'unit-shadow'}));
+      g.append(svgEl('circle',{cx:x,cy:y-lift,r:discSize,'class':`unit-disc ${u.owner?'red':'blue'}`}));
+      g.append(svgEl('text',{x,y:y-lift-4,'class':'unit-icon',style:`font-size:${Math.min(25,size*.58)}px`},CARDS[u.type].icon));
+      g.append(svgEl('text',{x,y:y-lift+discSize*.78,'class':'unit-hp'},`${'♥'.repeat(Math.min(u.hp,5))}${u.shield?' ◈'+u.shield:''}`));
+      if(u.owner===game.active&&u.activations>0)g.append(svgEl('text',{x:x-size*.55,y:y-lift-size*.39,'class':'unit-used'},u.activations===2?'2×':'✓'));
+      if(u.extraReady)g.append(svgEl('text',{x:x+size*.55,y:y-lift+size*.05,'class':'unit-status'},'✦'));
+      if(u.restUntil===game.players[u.owner].turns&&u.type==='ram')g.append(svgEl('text',{x:x+size*.56,y:y-lift-size*.42,'class':'unit-status'},'Z'));
+    }else if(!valid.has(key(q,r)))g.append(svgEl('text',{x,y:y+3,'class':'coord'},`${String.fromCharCode(65+q)}${r+1}`));
     board.append(g);
   }
 }
@@ -319,6 +348,7 @@ $('board').addEventListener('click',e=>{const g=e.target.closest('.hex');if(g)se
 $('board').addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){const g=e.target.closest('.hex');if(g){e.preventDefault();selectHex(+g.dataset.q,+g.dataset.r)}}});
 $('endTurn').onclick=endTurn;
 $('rollButton').onclick=rollItem;
+$('viewButton').onclick=switchView;
 $('newButton').onclick=()=>openSetup();
 $('cancelSetup').onclick=()=>$('setupDialog').close();
 $('setupDialog').addEventListener('cancel',e=>{if($('cancelSetup').classList.contains('hidden'))e.preventDefault()});

@@ -16,3 +16,7 @@
 - **Stored Extra Attack:** A non-stacking bonus held by the character that collected an Extra Attack item until it uses a second activation in a turn. It does not add player actions. A ram can charge twice in one turn before its required rest turn; an unused bonus survives that rest.
 - **Encounter cue:** A brief on-board description and visual effect shown when a character claims an item or strikes a fence. Hidden items are named only when encountered. Multiple cues are shown in event order and cleared at turn handoff.
 - **Hit cue:** A brief lunge from the attacker, a flash or shake on the defender, and a floating damage number. A shield block instead shows a shield cue. Motion is reduced for players who request reduced motion on their device.
+- **Isometric view:** The default fixed perspective, with equal-height raised hexes and upright character icons, labels, and effects. It changes appearance only; movement, attacks, and hidden-item visibility stay the same.
+- **Flat view:** The original overhead board, available from the View control beside How to play and New game. Switching views does not restart a match; the choice persists across new games during the current visit.
+- **Blacksmith icon (⚒):** Crossed tools identify a Blacksmith on its card and on the board.
+- **Battering Ram icon (🪵):** A log identifies the Battering Ram on its card and on the board, distinct from the Blacksmith's tools.

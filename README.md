@@ -18,6 +18,7 @@ In New Game setup, choose 5–9 rows (default 5), 6–12 hexes in the shorter ro
 - Attacking and moving are a single action. A character enters its destination if the target has been defeated or the fence destroyed. The dragon and ram have area attacks as described above.
 - Defeat an enemy for 1 glory (a dragon for 2), or reach the opposite edge with a character for the first time for 2 glory. The first player to reach 6 glory wins.
 - Item encounters show a brief on-board message describing the effect. Hits and shield blocks have visual cues and floating numbers. Multiple effects play in order without delaying actions; messages clear at turn handoff, and motion is reduced when requested by the device.
+- The battlefield starts in a fixed isometric view with raised hexes. Use **View: Isometric / Flat** beside How to play and New game to switch at any time. The choice is remembered for the current browser session, including new games; the grid, rules, and hidden-item visibility are unchanged.
 
 This is an initial ruleset intended for playtesting. It uses local pass-and-play rather than an AI or online opponent, and game state is not saved when the page is closed.
 
